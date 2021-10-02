@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Create a div where the graph will take place -->
+<body>
+        <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@observablehq/plot@0.2"></script>
+        <script src="https://unpkg.com/dayjs@1.8.21/dayjs.min.js"></script>
+        <script src="https://unpkg.com/dayjs@1.8.21/plugin/utc.js"></script>
+
+        <script src="https://unpkg.com/microcms-js-sdk@latest/dist/umd/microcms-js-sdk.js"></script>
+        <!-- <script src="./renew.js"></script> -->
+        <script src="./data.js"></script>
+        <script>
+            const { createClient } = microcms;
+
+            const fixTime = (datelist) => {
+                const fixTimeList = []
+                for (obj of datelist) {
+                    // let newcreatedAt = dayjs.utc(obj.createdAt).tz('Asia/Tokyo').format('YYYY-MM-DD')
+                    let newcreatedAt = dayjs(obj.createdAt).format('YYYY-MM-DD')
+                    fixTimeList.push({ dayString: newcreatedAt })
+                }
+                return fixTimeList
+            }
+
+
+            const converDateList = (datelist) => {
+                    let noDuplicateList = [];
+                    let fixedTimeList = fixTime(datelist);
+                    // console.log(fixedTimeList)
+                    const newDateList = fixedTimeList.reduce((acc, obj) => {
+                        obj.count = 1;
+                        let key = obj['dayString'];
+                        if (noDuplicateList.includes(key)) {
+                            let current_count = acc.slice(-1)[0].count;
+                            index = acc.findIndex((v) => v.dayString === key && v.count === current_count);
+                            acc[index].date = Date.parse(key);
+                            acc[index].count += 1;
+                            acc[index].dayString = key
+                        } else {
+                            acc.push({ date: Date.parse(obj.dayString), count: 1, dayString: obj.dayString });
+                            noDuplicateList.push(key);
+                        }
+                        return acc;
+                    }, []);
+                    return newDateList;
+                }
+            
+                const renderChart = (newDateList) => {
+                    document.body.appendChild(Plot.plot({
+                        facet: { newDateList, y: d => new Date(d.date).getFullYear() },
+                        fy: { tickPadding: 0, reverse: true },
+                        x: { label: 'Week of year' },
+                        y: { tickFormat: Plot.formatWeekday() },
+                        color: { scheme: 'gnbu' },
+                        marks: [
+                            Plot.cell(data, {
+                                x: d => d3.utcWeek.count(d3.utcYear(d.date), d.date),
+                                y: d => d3.utcDay.count(d3.utcWeek(d.date), d.date),
+                                title: d => `${d.count} page views on ${d.date}`,
+                                fill: 'count'
+                            })
+                        ],
+                        width: 1300,
+                        marginTop: 0,
+                        marginRight: 50,
+                        marginBottom: 35,
+                        style: { background: '#fff' },
+                    }));
+                }
+            // Initialize Client SDK.
+            const client = createClient({
+                serviceDomain: "laprn", // YOUR_DOMAIN is the XXXX part of XXXX.microcms.io
+                apiKey: "9ed5f06c-ca53-47b9-858d-23011966d6d0",
+            });
+            const data = client.get({
+                    endpoint: 'english',
+                    queries: { fields: 'createdAt', limit: 1000, orders: '-createdAt' }
+                });
+            data.then((res) => {
+                let keylist = converDateList(res.contents)
+                console.log("keylist:", keylist)
+                const newDateList = calendar.concat(keylist)
+                console.log(newDateList);
+                document.body.appendChild(Plot.plot({
+                    // facet: { newDateList, y: d => new Date(d.date).getFullYear() },
+                    facet: { data: newDateList, y: d => '2021'},
+                    fy: { tickPadding: 0, reverse: true },
+                    x: { label: 'Week of year' },
+                    y: { tickFormat: Plot.formatWeekday() },
+                    color: { scheme: 'gnbu' },
+                    marks: [
+                        Plot.cell(newDateList, {
+                            x: d => d3.utcWeek.count(d3.utcYear(d.date), d.date),
+                            y: d => d3.utcDay.count(d3.utcWeek(d.date), d.date),
+                            title: d => `${d.count} page views on ${d.date}`,
+                            fill: 'count'
+                        })
+                    ],
+                    width: 1300,
+                    marginTop: 0,
+                    marginRight: 50,
+                    marginBottom: 35,
+                    style: { background: '#fff' },
+                }));
+            });
+
+
+        </script>
+</body>
